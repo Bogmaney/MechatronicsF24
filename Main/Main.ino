@@ -6,7 +6,6 @@
 #include <PubSubClient.h>
 #include <SPI.h>
 #include <ArduinoJson.h>
-#include <Servo.h>
 // Definerer id og password til netværksforbindelse som NodeMCU anvender
 char *ssid = "Alb"; //Indsæt navnet på jeres netværk her
 const char *password = "aaaaaaaa"; //Indsæt password her
@@ -17,6 +16,7 @@ const char *mqtt_user = "s223989@dtu.dk"; // Definerer mqtt-brugeren
 const char *mqtt_pass = "1234"; // Definerer koden til mqtt-brugeren
 const int buttonPin = 7;  
 String payload; // Definerer variablen 'payload' i det globale scope (payload er navnet på besked-variablen)
+int lock = 2;
 
 /////// FUNKTIONSOPSÆTNING ////////
 // Opretter en placeholder for callback-funktionen til brug senere. Den rigtige funktion ses længere nede.
@@ -41,13 +41,13 @@ void callback(char* byteArraytopic, byte* byteArrayPayload, unsigned int length)
   Serial.println("] ");
   // Konverterer den indkomne besked (payload) fra en array til en string:
   // Topic == Temperaturmaaler, Topic == Kraftsensor
-  if(topic == "s223989@dtu.dk/Lås"){
+  if(topic == "s223989@dtu.dk/lock"){
     payload = ""; // Nulstil payload variablen så forloopet ikke appender til en allerede eksisterende payload
     for (int i = 0; i < length; i++) {
       payload += (char)byteArrayPayload[i];
     }
-    sense = payload.toInt();
-    Serial.println(sense);
+    lock = payload.toInt();
+    Serial.println(lock);
   }
 }
 
@@ -78,7 +78,7 @@ void reconnect() {
     if (client.connect("Mekatronik24", mqtt_user, mqtt_pass)) { // Forbinder til klient med mqtt bruger og password
       Serial.println("connected");
       // Derudover subsribes til topic "Test" hvor NodeMCU modtager payload beskeder fra
-      client.subscribe("s223989@dtu.dk/Lås");
+      client.subscribe("s223989@dtu.dk/lock");
       //client.subscribe("Test1");
       // Eller til samtlige topics ved at bruge '#' (Se Power Point fra d. 18. marts)
       // client.subscribe("#");
@@ -98,9 +98,20 @@ void reconnect() {
 void setup() {
   Serial.begin(115200); // Åbner serial porten og sætter data raten til 115200 baud
   delay(1000);
+  pinMode(3, OUTPUT);
+  pinMode(4, OUTPUT);
   setup_wifi(); // Kører WiFi loopet og forbinder herved.
   client.setServer(mqtt_server, mqtt_port); // Forbinder til mqtt serveren (defineret længere oppe)
   client.setCallback(callback); // Ingangsætter den definerede callback funktion hver gang der er en ny besked på den subscribede "cmd"- topic
+}
+
+///////// FUNCTIONS //////////
+void turnOnLED(bool LEDSTATE){
+  digitalWrite( 3, LEDSTATE);
+  digitalWrite(4, !LEDSTATE);
+  delay(1000);
+  digitalWrite(3, LOW);
+  digitalWrite(4, LOW);
 }
 
 /////// LOOP /////////
@@ -110,6 +121,11 @@ void loop() {
   }
   client.loop(); 
   delay(1000);
+  if(lock != 2){
+    turnOnLED(lock);
+
+    lock = 2;
+  }
   // Hvis der opstår problemer med forbindelsen til mqtt broker oprettes forbindelse igen ved at køre client loop
 }
 
