@@ -17,6 +17,11 @@ const char *mqtt_pass = "1234"; // Definerer koden til mqtt-brugeren
 const int buttonPin = 7;  
 String payload; // Definerer variablen 'payload' i det globale scope (payload er navnet på besked-variablen)
 int lock = 2;
+const int EN=9; //H-Br0 Enable
+const int MC1=3; //Motor Control 1
+const int MC2=2; //Motor Control 2
+
+int velocity = 255; //Hastighed (0-255)
 
 /////// FUNKTIONSOPSÆTNING ////////
 // Opretter en placeholder for callback-funktionen til brug senere. Den rigtige funktion ses længere nede.
@@ -98,8 +103,12 @@ void reconnect() {
 void setup() {
   Serial.begin(115200); // Åbner serial porten og sætter data raten til 115200 baud
   delay(1000);
-  pinMode(3, OUTPUT);
   pinMode(4, OUTPUT);
+  pinMode(5, OUTPUT);
+  pinMode(EN, OUTPUT);
+  pinMode(MC1, OUTPUT);
+  pinMode(MC2, OUTPUT);
+  brake();
   setup_wifi(); // Kører WiFi loopet og forbinder herved.
   client.setServer(mqtt_server, mqtt_port); // Forbinder til mqtt serveren (defineret længere oppe)
   client.setCallback(callback); // Ingangsætter den definerede callback funktion hver gang der er en ny besked på den subscribede "cmd"- topic
@@ -107,11 +116,35 @@ void setup() {
 
 ///////// FUNCTIONS //////////
 void turnOnLED(bool LEDSTATE){
-  digitalWrite( 3, LEDSTATE);
-  digitalWrite(4, !LEDSTATE);
+  digitalWrite(4, LEDSTATE);
+  digitalWrite(5, !LEDSTATE);
   delay(1000);
-  digitalWrite(3, LOW);
   digitalWrite(4, LOW);
+  digitalWrite(5, LOW);
+}
+
+void forward(int rate) //Motor kører frem ved værdi mellem (0-255)
+{
+  digitalWrite(EN, LOW);
+  digitalWrite(MC1, HIGH);
+  digitalWrite(MC2, LOW);
+  analogWrite(EN, rate);
+}
+
+void reverse(int rate) //Motor kører baglæns ved værdi mellem (0-255)
+{
+  digitalWrite(EN, LOW);
+  digitalWrite(MC1, LOW);
+  digitalWrite(MC2, HIGH);
+  analogWrite(EN, rate);
+}
+
+void brake() //Motor bremser 
+{
+  digitalWrite(EN, LOW);
+  digitalWrite(MC1, LOW);
+  digitalWrite(MC2, LOW);
+  digitalWrite(EN, HIGH);
 }
 
 /////// LOOP /////////
@@ -120,10 +153,11 @@ void loop() {
     reconnect();
   }
   client.loop(); 
-  delay(1000);
   if(lock != 2){
+    forward(velocity);
     turnOnLED(lock);
-
+    delay(3000);
+    brake();
     lock = 2;
   }
   // Hvis der opstår problemer med forbindelsen til mqtt broker oprettes forbindelse igen ved at køre client loop
